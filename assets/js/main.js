@@ -11,54 +11,71 @@
 	    editor.setTheme("ace/theme/tomorrow_night_eighties");
 	    editor.session.setMode("ace/mode/julia");
 		
-		var gen = new CodeGen(editor, model, alphabet, obj);
+		var gen = new CodeGen(model, alphabet, obj);
+		var scr = new Screen(gen, editor);
 		document.querySelector("#editor .replay").addEventListener("click", function(event){
 			obj.key++;
-			gen.setup();
-			setTimeout(gen.play.bind(gen), 100);
+			gen.play();
+			setTimeout(scr.play.bind(scr), 100);
 		})
 
-		gen.setup();
 		gen.play();
+		scr.play();
 	}
 
-	function CodeGen(editor, model, alphabet, refobj, batchlen=5, maxlen=100){
-		this.target = editor;
+	function Screen(gen, editor){
+		this.gen = gen;
+		this.editor = editor;
+	}
+
+	Screen.prototype.play = function(){
+		this.editor.setValue(this.gen.getVal(), 1);
+		requestAnimationFrame(this.play.bind(this));
+	}
+
+	function CodeGen(model, alphabet, refobj, batchlen=5, maxlen=100){
 		this.model = model;
 		this.alphabet = alphabet;
 		this.seed = "";
 		this.batchlen = batchlen;
 		this.maxlen = maxlen;
 		this.refobj = refobj;
+		this.buf = "";
 	}
 
+	CodeGen.prototype.getVal = function(){ return this.buf; }
+
 	CodeGen.prototype.setup = function(){
-		this.target.setValue("", 1);
+		this.buf = "";
 		this.model.reset();
 		this.seed = randomLetter(alphabet);
 	}
 
 	CodeGen.prototype.play = function() {
-		console.log(this)
-		return this.appendtext(0, this.refobj.key);
+		this.setup();
+		return this.fillbuf(0, this.refobj.key);
 	};
 
-	CodeGen.prototype.appendtext = async function(i, key){
-		if(key != this.refobj.key || i > this.maxlen)return;
-		var text = await sample(this.model, this.alphabet, this.batchlen, this.seed);
-		this.target.setValue(this.target.getValue() + text, 1);
-		this.seed = text.slice(-1);
-		next = () => this.appendtext(i + 1, key);
-		return requestAnimationFrame(next);
+	CodeGen.prototype.fillbuf = async function(i, key){
+		while(key == this.refobj.key && i < this.maxlen){
+			var text = await sample(this.model, this.alphabet, this.batchlen, this.seed);
+			this.buf += text;
+			this.seed = text.slice(-1);
+			i += 1;
+		}
 	}
 
 	async function sample(m, alphabet, len, c){
 		var buf = "";
-		var inp__, inp;
+		var out;
 	  	for(var i = 1; i<=len; i++){
-		    inp__ = tf.tensor([alphabet.indexOf(c)], [1], 'int32');
-		    inp = tf.oneHot(inp__, alphabet.length).unstack()[0].toFloat();
-		    c = await wsample(alphabet, m(inp));
+	  		out = tf.tidy(() =>{
+			    var inp__ = tf.tensor([alphabet.indexOf(c)], [1], 'int32');
+			    var inp = tf.oneHot(inp__, alphabet.length).unstack()[0].toFloat();
+			    return m(inp)
+			});
+		    c = await wsample(alphabet, out);
+		    tf.dispose(out);
 		    if(c == dummy)return buf + "\n"
 		    buf += c;
 	  	}
@@ -87,9 +104,11 @@
 		return end;
 	}
 
-	async function wsample(alphabet, dist){
-		dist = await tf.sub(dist.cumsum(), tf.scalar(Math.random())).data();
-		var i = findpos(dist);
+	async function wsample(alphabet, dist){ // safe
+		var rr = tf.tidy(() =>tf.sub(dist.cumsum(), tf.scalar(Math.random())));
+		var d = await rr.data();
+		tf.dispose(rr);
+		var i = findpos(d);
 		return alphabet[i];
 	}
 
