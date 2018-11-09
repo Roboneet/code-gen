@@ -80,7 +80,9 @@ const _data = t => (t instanceof tf.Tensor)? t.dataSync(): t;
 const slice = t => (t instanceof tf.Tensor)? t.clone():(
   t instanceof Array ? t.slice() : t);
 const iterate = (arr, i=1) => ([arr[i - 1], i + 1]);
+const deepcopy = t => (t instanceof tf.Tensor) ? t.clone() : (
+  t instanceof Array ? t.slice().map(deepcopy) : t);
 
-return {fetchData, fetchWeights, fetchBlob, data: _data, slice, iterate};
+return {fetchData, fetchWeights, fetchBlob, data: _data, slice, iterate, deepcopy};
 
 })();

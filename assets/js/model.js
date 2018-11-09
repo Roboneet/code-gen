@@ -56,7 +56,7 @@ let model = (function () {
     return math.softmax(spider(kangaroo(mandrill(pigeon(pig(caribou)))))); 
   };
   model.reset = (function () {
-    states = init.slice();
+    states = flux.deepcopy(init);
     return;
   });
   model.getStates = (function () {
@@ -66,8 +66,8 @@ let model = (function () {
     tf.dispose(init);
     tf.dispose(states);
     model.weights = ws;
-    init = [[model.weights[8], model.weights[9]], [model.weights[10], model.weights[11]]];
-    states = init.slice();
+    init = tf.keep([[model.weights[8], model.weights[9]], [model.weights[10], model.weights[11]]]);
+    states = flux.deepcopy(init);
     __init__();
     return;
   });
