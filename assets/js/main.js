@@ -1,39 +1,40 @@
+(function(obj){
+
+obj.__init__ = __init__;
+
 let alphabet = []
-var stop = false
+var exec_key = 0;
 function dummy(){}
 function __init__(){
 	var editor = ace.edit("code");
     editor.setTheme("ace/theme/tomorrow_night_eighties");
     editor.session.setMode("ace/mode/julia");
-
 	alphabet = ['\n', '\t', '\n', ...(new Array(95)).fill(0).map((e, i) => String.fromCharCode(i + 32)), dummy];
-	model.reset();
-	var seed = randomLetter(alphabet);
-	appendtext(model, alphabet, editor, 0, seed);
-
+	var play = (key) => appendtext(model, alphabet, editor, 0, setup(editor, model, alphabet), key)
 	document.querySelector("#editor .replay").addEventListener("click", function(event){
-		console.log("clicked")
-		stop = true;
-		editor.setValue("", 1);
-		setTimeout(()=>{
-			stop = false;
-			appendtext(model, alphabet, editor, 0, seed);
-		}, 100)
+		exec_key++;
+		setTimeout(() => play(exec_key), 100);
 	})
-
+	return play(exec_key);
 }
 
-async function appendtext(m, alphabet, target, i, seed){
-	if(stop || i > 100)return;
+function setup(editor, model, alphabet){
+	editor.setValue("", 1);
+	model.reset();
+	return randomLetter(alphabet);
+}
+
+async function appendtext(m, alphabet, target, i, seed, key){
+	if(key != exec_key || i > 100)return;
 	var text = await sample(m, alphabet, 5, seed);
-	seed = text.slice(-1)
+	seed = text.slice(-1);
 	target.setValue(target.getValue() + text, 1);
-	requestAnimationFrame(() => appendtext(m, alphabet, target, i + 1, seed))
+	return requestAnimationFrame(() => appendtext(m, alphabet, target, i + 1, seed, key))
 }
 
 async function sample(m, alphabet, len, c){
 	var buf = ""
-  	for(i = 1; i<=len; i++){
+  	for(var i = 1; i<=len; i++){
 	    var inp__ = tf.tensor([alphabet.indexOf(c)], [1], 'int32');
 	    var inp = tf.oneHot(inp__, alphabet.length).unstack()[0].toFloat();
 	    c = await wsample(alphabet, m(inp));
@@ -52,24 +53,24 @@ function findpos(arr, start, end){
 	start = start || 0;
 	end = end || l - 1;
 	var mid;
-
 	while(end >= start){
 		if(end == start)return end;
-		if(arr[end] <= 0|0) return end;
-		if(arr[start] > 0|0) return start;
+		if(arr[end] <= 0)return end;
+		if(arr[start] > 0)return start;
 		
 		mid = Math.floor((start + end)/2);
-		if (arr[mid] <= 0|0){
+		if (arr[mid] <= 0)
 			start = mid + 1;
-		}
-		else{
+		else
 			end = mid;
-		}
 	}
+	return end;
 }
 
 async function wsample(alphabet, dist){
 	dist = await tf.sub(dist.cumsum(), tf.scalar(Math.random())).data();
 	var i = findpos(dist);
-	return alphabet[i]
+	return alphabet[i];
 }
+
+}(window))
