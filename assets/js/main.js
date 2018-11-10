@@ -62,6 +62,10 @@
 			this.buf += text;
 			this.seed = text.slice(-1);
 			i += 1;
+			if(i % 10 == 0){
+				setTimeout(() => this.fillbuf(i, key), 100);
+				return;
+			}
 		}
 	}
 
